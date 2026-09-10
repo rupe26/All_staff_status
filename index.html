@@ -6,8 +6,6 @@
 <title>शिक्षक नोंदवही</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Serif:ital,wght@0,500;0,600;0,700;1,500&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- HTML2PDF Library (Unicode & Layout Support) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <style>
   :root{
     --navy:#16303F;
@@ -218,15 +216,38 @@
     pointer-events:none;
   }
   .toast.show{opacity:1;bottom:30px;}
-
-  .notice{background:#FBF2DC;border:1px solid #E4CE95;color:#5C4413;padding:10px 13px;border-radius:4px;font-size:12.5px;margin-bottom:16px;}
-
   footer.foot{text-align:center;padding:26px 14px 34px;color:var(--ink-soft);font-size:12px;}
 
   @media (max-width:600px){
     .lh-text h1{font-size:16px;}
     .bar-row .bar-label{width:90px;font-size:12px;}
     .field-row{flex-direction:column;gap:0;}
+  }
+
+  /* ---------- Print Styles (Natively Avoids Page Breaks!) ---------- */
+  @media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 0; background: #fff; color: #000; font-family: sans-serif; }
+    
+    #printArea h2 { margin: 0 0 5px; font-size: 22px; text-align: center; }
+    #printArea .print-sub { text-align: center; font-size: 14px; margin-bottom: 20px; }
+    
+    /* Table Styling for Print */
+    #printArea table { width: 100%; border-collapse: collapse; font-size: 11pt; margin-top: 10px; page-break-inside: auto; }
+    #printArea th, #printArea td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+    #printArea th { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    
+    /* Header Data Table */
+    #printArea .header-table { border: none; border-bottom: 2px solid #000; margin-bottom: 15px; padding-bottom: 10px; }
+    #printArea .header-table td { border: none; padding: 4px; }
+    
+    /* Magical Page Break Rules */
+    #printArea thead { display: table-header-group; } /* Repeats headers on new pages */
+    #printArea tfoot { display: table-footer-group; }
+    #printArea tr { page-break-inside: avoid; break-inside: avoid; } /* PREVENTS ROWS FROM SPLITTING */
+    
+    @page { margin: 15mm; }
   }
 </style>
 </head>
@@ -260,11 +281,14 @@
 <div id="modalRoot"></div>
 <div id="toastRoot" class="toast"></div>
 
+<!-- Native Print Area Container -->
+<div id="printArea"></div>
+
 <script>
 /* =========================================================
    DATA & CONFIG
    ========================================================= */
-const SEED_DATA = [{"id":"t1","brc":"AMBAJOGAI","school":"ALLAM SIDDIQUE AL. URDU HS PIMPALA DHAIGUDA","udise":"27270103202","teacher":"SAYED F H","status":"Active","custom":{}},{"id":"t2","brc":"AMBAJOGAI","school":"ALLAM SIDDIQUE AL. URDU HS PIMPALA DHAIGUDA","udise":"27270103202","teacher":"SHAIKH A K","status":"Active","custom":{}},{"id":"t3","brc":"AMBAJOGAI","school":"ALLAM SIDDIQUE AL. URDU HS PIMPALA DHAIGUDA","udise":"27270103202","teacher":"SHAIKH I K","status":"Active","custom":{}}]; // (Truncated to save space, will load existing anyway)
+const SEED_DATA = [{"id":"t1","brc":"AMBAJOGAI","school":"ALLAM SIDDIQUE AL. URDU HS PIMPALA DHAIGUDA","udise":"27270103202","teacher":"SAYED F H","status":"Active","custom":{}},{"id":"t2","brc":"AMBAJOGAI","school":"ALLAM SIDDIQUE AL. URDU HS PIMPALA DHAIGUDA","udise":"27270103202","teacher":"SHAIKH A K","status":"Active","custom":{}},{"id":"t3","brc":"AMBAJOGAI","school":"ALLAM SIDDIQUE AL. URDU HS PIMPALA DHAIGUDA","udise":"27270103202","teacher":"SHAIKH I K","status":"Active","custom":{}}]; 
 
 // New Status Options
 const STATUS_OPTS = ["उपस्थित", "गैरहजर", "किरकोळ रजा", "अर्जित रजा", "वैद्यकीय रजा", "इतर"];
@@ -293,14 +317,6 @@ let headerSettings = {
   sub: "Cluster Teacher Register",
   venue: "",
   date: ""
-};
-
-let state = {
-  tab: "dashboard",
-  teacherSearch:"", teacherStatus:"", teacherBrc:"",
-  teacherPage:1, pageSize:40,
-  schoolSearch:"",
-  openSchool:null
 };
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGYiFsV-ee7CpNG1uEj9PEQzKuw9W3-BXRBrlm49CKwiFjFbhAdFPqMlXBqHz82RU/exec";
@@ -366,12 +382,8 @@ async function saveDB(){
   }
 }
 
-async function getAdminPassword(){
-  return localStorage.getItem('admin-password');
-}
-async function setAdminPassword(pw){
-  localStorage.setItem('admin-password', pw);
-}
+async function getAdminPassword(){ return localStorage.getItem('admin-password'); }
+async function setAdminPassword(pw){ localStorage.setItem('admin-password', pw); }
 function saveHeaderSettings(s){
   headerSettings = s;
   localStorage.setItem('header-settings', JSON.stringify(s));
@@ -494,7 +506,7 @@ async function openLoginModal(){
       <div class="modal">
         <div class="modal-head"><h3>प्रशासक पासवर्ड तयार करा</h3><button class="modal-close" id="mc">×</button></div>
         <div class="modal-body">
-          <p class="helptext">या डिव्हाइसवर अद्याप प्रशासक पासवर्ड नाही. संपादन आणि PDF डाउनलोड करण्यासाठी एक पासवर्ड तयार करा.</p>
+          <p class="helptext">या डिव्हाइसवर अद्याप प्रशासक पासवर्ड नाही. संपादन आणि प्रिंट करण्यासाठी एक पासवर्ड तयार करा.</p>
           <div class="field"><label>नवीन पासवर्ड</label><input type="password" class="input" id="pw1"></div>
           <div class="field"><label>पासवर्ड पुन्हा टाका</label><input type="password" class="input" id="pw2"></div>
           <div class="modal-actions">
@@ -681,116 +693,104 @@ function requireAdmin(action){
 }
 
 /* =========================================================
-   PDF EXPORT (Direct HTML String Approach for Perfect Layout)
+   PRINT IMPLEMENTATION (Native Browser Page Breaks)
    ========================================================= */
-function exportSchoolPdf(schoolInfo){
-  showToast('PDF तयार होत आहे, कृपया प्रतीक्षा करा...');
+
+function triggerPrintDialog(htmlContent, documentTitle) {
+  const printArea = document.getElementById('printArea');
+  printArea.innerHTML = htmlContent;
+
+  // Temporarily set document title so exported PDF defaults to good name
+  const originalTitle = document.title;
+  document.title = documentTitle;
+
+  window.print();
+
+  // Cleanup after printing
+  document.title = originalTitle;
+  printArea.innerHTML = '';
+}
+
+function printSchoolInfo(schoolInfo){
   const list = schoolInfo.teachers;
   const customCols = customKeysFor(list);
 
-  // Black and White tabular format with inline styling explicitly set
   const html = `
-    <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', sans-serif; color: #000; background: #fff; padding: 15px;">
-      <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
-      <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
-      
-      <table style="width: 100%; font-size: 13px; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px;">
+    <h2>${esc(headerSettings.title)}</h2>
+    <div class="print-sub">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
+    
+    <table class="header-table">
+      <tr>
+        <td style="text-align: left; vertical-align: top;">
+          <b>शाळा (School):</b> ${esc(schoolInfo.school)}<br>
+          <b>UDISE:</b> ${esc(schoolInfo.udise || '-')} &nbsp;&nbsp;&nbsp; <b>BRC:</b> ${esc(schoolInfo.brc || '-')}
+        </td>
+        <td style="text-align: right; vertical-align: bottom;">
+          <b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}
+        </td>
+      </tr>
+    </table>
+
+    <table>
+      <thead>
         <tr>
-          <td style="text-align: left; vertical-align: top;">
-            <b>शाळा (School):</b> ${esc(schoolInfo.school)}<br>
-            <b>UDISE:</b> ${esc(schoolInfo.udise || '-')} &nbsp;&nbsp;&nbsp; <b>BRC:</b> ${esc(schoolInfo.brc || '-')}
-          </td>
-          <td style="text-align: right; vertical-align: bottom;">
-            <b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}
-          </td>
+          <th>अ.क्र.</th>
+          <th>शिक्षकाचे नाव</th>
+          <th>स्थिती</th>
+          ${customCols.map(c => `<th>${esc(c)}</th>`).join('')}
         </tr>
-      </table>
-
-      <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
-        <thead>
+      </thead>
+      <tbody>
+        ${list.map((t, i) => `
           <tr>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">अ.क्र.</th>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">शिक्षकाचे नाव</th>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">स्थिती</th>
-            ${customCols.map(c => `<th style="border: 1px solid #000; padding: 6px; text-align:left;">${esc(c)}</th>`).join('')}
+            <td>${i+1}</td>
+            <td>${esc(t.teacher)}</td>
+            <td>${esc(statusLabel(t.status))}</td>
+            ${customCols.map(c => `<td>${esc((t.custom && t.custom[c]) || '-')}</td>`).join('')}
           </tr>
-        </thead>
-        <tbody>
-          ${list.map((t, i) => `
-            <tr style="page-break-inside: avoid;">
-              <td style="border: 1px solid #000; padding: 6px;">${i+1}</td>
-              <td style="border: 1px solid #000; padding: 6px;">${esc(t.teacher)}</td>
-              <td style="border: 1px solid #000; padding: 6px;">${esc(statusLabel(t.status))}</td>
-              ${customCols.map(c => `<td style="border: 1px solid #000; padding: 6px;">${esc((t.custom && t.custom[c]) || '-')}</td>`).join('')}
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
+        `).join('')}
+      </tbody>
+    </table>
   `;
-  
-  const opt = {
-    margin:       0.3, // Margin in inches
-    filename:     `${schoolInfo.school.trim().replace(/[^a-zA-Z0-9]+/g,'_').slice(0,40)}_teachers.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: 'css', avoid: 'tr' }
-  };
-
-  html2pdf().set(opt).from(html).save();
+  triggerPrintDialog(html, `${schoolInfo.school.trim()}_Teachers`);
 }
 
-function exportFullPdf(list, titleText){
-  showToast('PDF तयार होत आहे, कृपया प्रतीक्षा करा...');
-  
+function printFullInfo(list, titleText){
   const html = `
-    <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', sans-serif; color: #000; background: #fff; padding: 15px;">
-      <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
-      <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
-      
-      <table style="width: 100%; font-size: 13px; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px;">
+    <h2>${esc(headerSettings.title)}</h2>
+    <div class="print-sub">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
+    
+    <table class="header-table">
+      <tr>
+        <td style="text-align: left;"><b>एकूण नोंदी (Total Records):</b> ${list.length}</td>
+        <td style="text-align: right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</td>
+      </tr>
+    </table>
+
+    <table>
+      <thead>
         <tr>
-          <td style="text-align: left;"><b>एकूण नोंदी (Total Records):</b> ${list.length}</td>
-          <td style="text-align: right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</td>
+          <th>अ.क्र.</th>
+          <th>शाळा</th>
+          <th>UDISE</th>
+          <th>शिक्षकाचे नाव</th>
+          <th>स्थिती</th>
         </tr>
-      </table>
-
-      <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
-        <thead>
+      </thead>
+      <tbody>
+        ${list.map((t, i) => `
           <tr>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">अ.क्र.</th>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">शाळा</th>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">UDISE</th>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">शिक्षकाचे नाव</th>
-            <th style="border: 1px solid #000; padding: 6px; text-align:left;">स्थिती</th>
+            <td>${i+1}</td>
+            <td>${esc(t.school)}</td>
+            <td>${esc(t.udise || '-')}</td>
+            <td>${esc(t.teacher)}</td>
+            <td>${esc(statusLabel(t.status))}</td>
           </tr>
-        </thead>
-        <tbody>
-          ${list.map((t, i) => `
-            <tr style="page-break-inside: avoid;">
-              <td style="border: 1px solid #000; padding: 6px;">${i+1}</td>
-              <td style="border: 1px solid #000; padding: 6px;">${esc(t.school)}</td>
-              <td style="border: 1px solid #000; padding: 6px;">${esc(t.udise || '-')}</td>
-              <td style="border: 1px solid #000; padding: 6px;">${esc(t.teacher)}</td>
-              <td style="border: 1px solid #000; padding: 6px;">${esc(statusLabel(t.status))}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
+        `).join('')}
+      </tbody>
+    </table>
   `;
-  
-  const opt = {
-    margin:       0.3,
-    filename:     `Teacher_Register_Full.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: 'css', avoid: 'tr' }
-  };
-
-  html2pdf().set(opt).from(html).save();
+  triggerPrintDialog(html, 'Teacher_Register_Full');
 }
 
 /* =========================================================
@@ -840,7 +840,7 @@ function renderDashboard(){
       <h3>त्वरित कृती (प्रशासक)</h3>
       <div class="toolbar" style="margin-bottom:0;">
         <button class="btn btn-navy" id="dashAddTeacher">+ नवीन शिक्षक जोडा</button>
-        <button class="btn btn-ghost" id="dashExportAll">संपूर्ण यादी PDF डाउनलोड करा</button>
+        <button class="btn btn-ghost" id="dashExportAll">🖨️ संपूर्ण यादी प्रिंट करा</button>
       </div>
     </div>` : ''}
   `;
@@ -880,7 +880,7 @@ function renderTeachersTab(){
       </select>`:''}
       <div class="spacer"></div>
       ${isAdmin ? `
-        <button class="btn btn-ghost" id="exportFilteredPdf">फिल्टर केलेली यादी PDF</button>
+        <button class="btn btn-ghost" id="exportFilteredPdf">🖨️ फिल्टर केलेली यादी प्रिंट करा</button>
         <button class="btn btn-navy" id="addTeacherBtn">+ नवीन शिक्षक</button>
       `:''}
     </div>
@@ -976,7 +976,7 @@ function renderSchoolDetail(info){
       
       ${isAdmin ? `
       <div class="toolbar" style="margin-bottom:0;">
-        <button class="btn btn-maroon" id="downloadSchoolPdf">⬇ PDF यादी डाउनलोड करा</button>
+        <button class="btn btn-maroon" id="printSchoolBtn">🖨️ यादी प्रिंट करा</button>
         <button class="btn btn-navy" id="addTeacherToSchool">+ शिक्षक जोडा</button>
         <button class="btn btn-outline-light" style="color:var(--ink); border-color:var(--line);" id="toggleSchoolHide">
            ${isHidden ? '👁️ ही शाळा पब्लिकला दाखवा' : '🚫 ही शाळा पब्लिकपासून लपवा'}
@@ -1023,7 +1023,7 @@ function attachHandlers(){
     const e = document.getElementById('dashExportAll');
     if(e) e.onclick = ()=> {
        let list = DB.filter(r => !hiddenSchools.includes(r.school+'||'+r.udise));
-       exportFullPdf(list, 'Teacher Register');
+       printFullInfo(list, 'Teacher Register');
     };
   }
 
@@ -1036,6 +1036,7 @@ function attachHandlers(){
     if(br){ br.onchange = ()=>{ state.teacherBrc=br.value; state.teacherPage=1; render(); }; }
     const add = document.getElementById('addTeacherBtn');
     if(add) add.onclick = ()=> openTeacherForm(null);
+    
     const exp = document.getElementById('exportFilteredPdf');
     if(exp) exp.onclick = ()=>{
       let list = DB.filter(r=>{
@@ -1048,7 +1049,7 @@ function attachHandlers(){
         }
         return true;
       });
-      exportFullPdf(list, 'Filtered List');
+      printFullInfo(list, 'Filtered List');
     };
     
     document.querySelectorAll('.edit-row').forEach(btn=>{
@@ -1074,7 +1075,7 @@ function attachHandlers(){
     const back = document.getElementById('backToSchools');
     if(back) back.onclick = ()=>{ state.openSchool=null; render(); };
     
-    const dl = document.getElementById('downloadSchoolPdf');
+    const dl = document.getElementById('printSchoolBtn');
     if(dl) dl.onclick = ()=>{
       let allS = new Map();
       DB.forEach(r=>{
@@ -1083,7 +1084,7 @@ function attachHandlers(){
         allS.get(key).teachers.push(r);
       });
       const info = Array.from(allS.values()).find(x=>x.school+'||'+x.udise===state.openSchool);
-      if(info) exportSchoolPdf(info);
+      if(info) printSchoolInfo(info);
     };
     
     const addToSchool = document.getElementById('addTeacherToSchool');
@@ -1122,6 +1123,14 @@ function attachHandlers(){
 /* =========================================================
    INIT
    ========================================================= */
+let state = {
+  tab: "dashboard",
+  teacherSearch:"", teacherStatus:"", teacherBrc:"",
+  teacherPage:1, pageSize:40,
+  schoolSearch:"",
+  openSchool:null
+};
+
 (async function init(){
   document.getElementById('app').innerHTML = `<div class="empty-state">माहिती लोड होत आहे…</div>`;
   await loadDB();
