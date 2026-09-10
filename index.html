@@ -6,8 +6,8 @@
 <title>शिक्षक नोंदवही</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Serif:ital,wght@0,500;0,600;0,700;1,500&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- Changed PDF Library to support Unicode/Marathi properly -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <style>
   :root{
     --navy:#16303F;
@@ -308,7 +308,6 @@ let sheetSync = { connected:false, lastSync:null, busy:false };
 
 function normalizeRecord(r){
   let st = r.status;
-  // Migrate legacy English statuses to new Marathi default
   if(st === 'Active') st = 'उपस्थित';
   if(!STATUS_OPTS.includes(st)) st = 'उपस्थित';
 
@@ -333,7 +332,7 @@ async function loadDB(){
   }catch(e){ console.error(e); }
   
   if(!DB || !DB.length) DB = SEED_DATA.map(r => normalizeRecord(r));
-  else DB = DB.map(r => normalizeRecord(r)); // Ensure normalized statuses
+  else DB = DB.map(r => normalizeRecord(r)); 
 
   try {
     const hs = localStorage.getItem('hidden-schools');
@@ -345,7 +344,6 @@ async function loadDB(){
 
   renderHeaderText();
 
-  // Try Google Sheet Sync silently
   try{
     const res = await fetch(SCRIPT_URL + '?action=list');
     const json = await res.json();
@@ -417,7 +415,6 @@ function uniqueSchools(){
     if(!map.has(key)) map.set(key, {school:r.school, udise:r.udise, brc:r.brc, teachers:[]});
     map.get(key).teachers.push(r);
   });
-  // Filter out hidden schools for public users
   return Array.from(map.values())
     .filter(s => isAdmin || !hiddenSchools.includes(s.school+'||'+s.udise))
     .sort((a,b)=>a.school.localeCompare(b.school));
@@ -684,51 +681,122 @@ function requireAdmin(action){
 }
 
 /* =========================================================
-   PDF EXPORT
+   PDF EXPORT - USING HTML2PDF (Black and White Tabular Format)
    ========================================================= */
+function createPrintContainer() {
+  const div = document.createElement('div');
+  div.style.position = 'absolute';
+  div.style.left = '-9999px';
+  div.style.top = '0';
+  div.style.width = '800px'; 
+  div.style.padding = '20px';
+  div.style.fontFamily = "'Noto Sans Devanagari', 'Noto Sans', sans-serif";
+  div.style.color = '#000'; // Pure Black Text
+  div.style.background = '#fff'; // Pure White Background
+  return div;
+}
+
 function exportSchoolPdf(schoolInfo){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+  showToast('PDF तयार होत आहे, कृपया प्रतीक्षा करा...');
   const list = schoolInfo.teachers;
   const customCols = customKeysFor(list);
 
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
-  doc.text(headerSettings.title, 14, 16);
-  doc.setFontSize(10); doc.setFont('helvetica','normal');
-  doc.text(`School: ${schoolInfo.school}`, 14, 24);
-  doc.text(`UDISE No: ${schoolInfo.udise || '-'}      BRC: ${schoolInfo.brc || '-'}`, 14, 30);
-  doc.text(`Date: ${headerSettings.date || new Date().toLocaleDateString('en-IN')}`, 14, 36);
+  const div = createPrintContainer();
+  let html = `
+    <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
+    <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
+    <div style="font-size: 13px; margin-bottom: 15px; display:flex; justify-content:space-between; border-bottom: 1px solid #000; padding-bottom: 5px;">
+      <div><b>शाळा (School):</b> ${esc(schoolInfo.school)}<br><b>UDISE:</b> ${esc(schoolInfo.udise || '-')} &nbsp;&nbsp;&nbsp; <b>BRC:</b> ${esc(schoolInfo.brc || '-')}</div>
+      <div style="text-align:right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</div>
+    </div>
+    <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
+      <thead>
+        <tr>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">अ.क्र.</th>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">शिक्षकाचे नाव</th>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">स्थिती</th>
+          ${customCols.map(c => `<th style="border: 1px solid #000; padding: 8px; text-align:left;">${esc(c)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((t, i) => `
+          <tr style="page-break-inside: avoid;">
+            <td style="border: 1px solid #000; padding: 8px;">${i+1}</td>
+            <td style="border: 1px solid #000; padding: 8px;">${esc(t.teacher)}</td>
+            <td style="border: 1px solid #000; padding: 8px;">${esc(statusLabel(t.status))}</td>
+            ${customCols.map(c => `<td style="border: 1px solid #000; padding: 8px;">${esc((t.custom && t.custom[c]) || '-')}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  
+  div.innerHTML = html;
+  document.body.appendChild(div);
 
-  const head = [['Sr','Teacher Name','Status', ...customCols]];
-  const body = list.map((t,i)=>[
-    i+1, t.teacher, t.status, ...customCols.map(c=> (t.custom&&t.custom[c])?t.custom[c]:'-')
-  ]);
-  doc.autoTable({
-    head, body, startY:42, styles:{fontSize:9, cellPadding:3, font:'helvetica'},
-    headStyles:{fillColor:[22,48,63], textColor:255},
-    alternateRowStyles:{fillColor:[246,241,228]},
-    margin:{left:14,right:14}
+  const opt = {
+    margin:       [0.5, 0.5, 0.5, 0.5],
+    filename:     `${schoolInfo.school.trim().replace(/[^a-zA-Z0-9]+/g,'_').slice(0,40)}_teachers.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: 'css', avoid: 'tr' }
+  };
+
+  html2pdf().set(opt).from(div).save().then(() => {
+    document.body.removeChild(div);
   });
-  doc.save(`${schoolInfo.school.trim().replace(/[^a-zA-Z0-9]+/g,'_').slice(0,50)}_teachers.pdf`);
 }
 
-function exportFullPdf(list, title){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
-  doc.text(headerSettings.title + ' - Full List', 14, 16);
-  doc.setFontSize(10); doc.setFont('helvetica','normal');
-  doc.text(`Total records: ${list.length}      Generated: ${new Date().toLocaleDateString('en-IN')}`, 14, 24);
-  const head = [['Sr','School','UDISE','Teacher Name','Status']];
-  const body = list.map((t,i)=>[i+1, t.school, t.udise||'-', t.teacher, t.status]);
-  doc.autoTable({
-    head, body, startY:30, styles:{fontSize:8, cellPadding:2.5, font:'helvetica'},
-    headStyles:{fillColor:[22,48,63], textColor:255},
-    alternateRowStyles:{fillColor:[246,241,228]},
-    columnStyles:{1:{cellWidth:60}},
-    margin:{left:12,right:12}
+function exportFullPdf(list, titleText){
+  showToast('PDF तयार होत आहे, कृपया प्रतीक्षा करा...');
+  const div = createPrintContainer();
+  let html = `
+    <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
+    <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
+    <div style="font-size: 13px; margin-bottom: 15px; display:flex; justify-content:space-between; border-bottom: 1px solid #000; padding-bottom: 5px;">
+      <div><b>एकूण नोंदी (Total Records):</b> ${list.length}</div>
+      <div style="text-align:right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</div>
+    </div>
+    <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
+      <thead>
+        <tr>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">अ.क्र.</th>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">शाळा</th>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">UDISE</th>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">शिक्षकाचे नाव</th>
+          <th style="border: 1px solid #000; padding: 8px; text-align:left;">स्थिती</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((t, i) => `
+          <tr style="page-break-inside: avoid;">
+            <td style="border: 1px solid #000; padding: 8px;">${i+1}</td>
+            <td style="border: 1px solid #000; padding: 8px;">${esc(t.school)}</td>
+            <td style="border: 1px solid #000; padding: 8px;">${esc(t.udise || '-')}</td>
+            <td style="border: 1px solid #000; padding: 8px;">${esc(t.teacher)}</td>
+            <td style="border: 1px solid #000; padding: 8px;">${esc(statusLabel(t.status))}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  
+  div.innerHTML = html;
+  document.body.appendChild(div);
+
+  const opt = {
+    margin:       [0.5, 0.5, 0.5, 0.5],
+    filename:     `Teacher_Register_Full.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: 'css', avoid: 'tr' }
+  };
+
+  html2pdf().set(opt).from(div).save().then(() => {
+    document.body.removeChild(div);
   });
-  doc.save('teacher_register_full.pdf');
 }
 
 /* =========================================================
@@ -866,7 +934,6 @@ function renderSchoolsTab(){
   });
 
   if(state.openSchool){
-    // even if hidden, admin should be able to open it
     let allS = new Map();
     DB.forEach(r=>{
       const key = r.school+'||'+r.udise;
