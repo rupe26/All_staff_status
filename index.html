@@ -6,7 +6,7 @@
 <title>शिक्षक नोंदवही</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Serif:ital,wght@0,500;0,600;0,700;1,500&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- Changed PDF Library to support Unicode/Marathi properly -->
+<!-- HTML2PDF Library (Unicode & Layout Support) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <style>
   :root{
@@ -681,61 +681,56 @@ function requireAdmin(action){
 }
 
 /* =========================================================
-   PDF EXPORT - USING HTML2PDF (Black and White Tabular Format)
+   PDF EXPORT (Direct HTML String Approach for Perfect Layout)
    ========================================================= */
-function createPrintContainer() {
-  const div = document.createElement('div');
-  div.style.position = 'absolute';
-  div.style.left = '-9999px';
-  div.style.top = '0';
-  div.style.width = '800px'; 
-  div.style.padding = '20px';
-  div.style.fontFamily = "'Noto Sans Devanagari', 'Noto Sans', sans-serif";
-  div.style.color = '#000'; // Pure Black Text
-  div.style.background = '#fff'; // Pure White Background
-  return div;
-}
-
 function exportSchoolPdf(schoolInfo){
   showToast('PDF तयार होत आहे, कृपया प्रतीक्षा करा...');
   const list = schoolInfo.teachers;
   const customCols = customKeysFor(list);
 
-  const div = createPrintContainer();
-  let html = `
-    <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
-    <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
-    <div style="font-size: 13px; margin-bottom: 15px; display:flex; justify-content:space-between; border-bottom: 1px solid #000; padding-bottom: 5px;">
-      <div><b>शाळा (School):</b> ${esc(schoolInfo.school)}<br><b>UDISE:</b> ${esc(schoolInfo.udise || '-')} &nbsp;&nbsp;&nbsp; <b>BRC:</b> ${esc(schoolInfo.brc || '-')}</div>
-      <div style="text-align:right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</div>
-    </div>
-    <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
-      <thead>
+  // Black and White tabular format with inline styling explicitly set
+  const html = `
+    <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', sans-serif; color: #000; background: #fff; padding: 15px;">
+      <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
+      <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
+      
+      <table style="width: 100%; font-size: 13px; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px;">
         <tr>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">अ.क्र.</th>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">शिक्षकाचे नाव</th>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">स्थिती</th>
-          ${customCols.map(c => `<th style="border: 1px solid #000; padding: 8px; text-align:left;">${esc(c)}</th>`).join('')}
+          <td style="text-align: left; vertical-align: top;">
+            <b>शाळा (School):</b> ${esc(schoolInfo.school)}<br>
+            <b>UDISE:</b> ${esc(schoolInfo.udise || '-')} &nbsp;&nbsp;&nbsp; <b>BRC:</b> ${esc(schoolInfo.brc || '-')}
+          </td>
+          <td style="text-align: right; vertical-align: bottom;">
+            <b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}
+          </td>
         </tr>
-      </thead>
-      <tbody>
-        ${list.map((t, i) => `
-          <tr style="page-break-inside: avoid;">
-            <td style="border: 1px solid #000; padding: 8px;">${i+1}</td>
-            <td style="border: 1px solid #000; padding: 8px;">${esc(t.teacher)}</td>
-            <td style="border: 1px solid #000; padding: 8px;">${esc(statusLabel(t.status))}</td>
-            ${customCols.map(c => `<td style="border: 1px solid #000; padding: 8px;">${esc((t.custom && t.custom[c]) || '-')}</td>`).join('')}
+      </table>
+
+      <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
+        <thead>
+          <tr>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">अ.क्र.</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">शिक्षकाचे नाव</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">स्थिती</th>
+            ${customCols.map(c => `<th style="border: 1px solid #000; padding: 6px; text-align:left;">${esc(c)}</th>`).join('')}
           </tr>
-        `).join('')}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${list.map((t, i) => `
+            <tr style="page-break-inside: avoid;">
+              <td style="border: 1px solid #000; padding: 6px;">${i+1}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${esc(t.teacher)}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${esc(statusLabel(t.status))}</td>
+              ${customCols.map(c => `<td style="border: 1px solid #000; padding: 6px;">${esc((t.custom && t.custom[c]) || '-')}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
   
-  div.innerHTML = html;
-  document.body.appendChild(div);
-
   const opt = {
-    margin:       [0.5, 0.5, 0.5, 0.5],
+    margin:       0.3, // Margin in inches
     filename:     `${schoolInfo.school.trim().replace(/[^a-zA-Z0-9]+/g,'_').slice(0,40)}_teachers.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true },
@@ -743,50 +738,51 @@ function exportSchoolPdf(schoolInfo){
     pagebreak:    { mode: 'css', avoid: 'tr' }
   };
 
-  html2pdf().set(opt).from(div).save().then(() => {
-    document.body.removeChild(div);
-  });
+  html2pdf().set(opt).from(html).save();
 }
 
 function exportFullPdf(list, titleText){
   showToast('PDF तयार होत आहे, कृपया प्रतीक्षा करा...');
-  const div = createPrintContainer();
-  let html = `
-    <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
-    <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
-    <div style="font-size: 13px; margin-bottom: 15px; display:flex; justify-content:space-between; border-bottom: 1px solid #000; padding-bottom: 5px;">
-      <div><b>एकूण नोंदी (Total Records):</b> ${list.length}</div>
-      <div style="text-align:right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</div>
-    </div>
-    <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
-      <thead>
+  
+  const html = `
+    <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', sans-serif; color: #000; background: #fff; padding: 15px;">
+      <h2 style="text-align:center; margin: 0 0 5px 0; font-size: 20px;">${esc(headerSettings.title)}</h2>
+      <div style="text-align:center; font-size: 14px; margin-bottom: 15px;">${esc(headerSettings.sub)} ${headerSettings.venue ? '| '+esc(headerSettings.venue) : ''}</div>
+      
+      <table style="width: 100%; font-size: 13px; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px;">
         <tr>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">अ.क्र.</th>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">शाळा</th>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">UDISE</th>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">शिक्षकाचे नाव</th>
-          <th style="border: 1px solid #000; padding: 8px; text-align:left;">स्थिती</th>
+          <td style="text-align: left;"><b>एकूण नोंदी (Total Records):</b> ${list.length}</td>
+          <td style="text-align: right;"><b>दिनांक (Date):</b> ${esc(headerSettings.date || new Date().toLocaleDateString('en-IN'))}</td>
         </tr>
-      </thead>
-      <tbody>
-        ${list.map((t, i) => `
-          <tr style="page-break-inside: avoid;">
-            <td style="border: 1px solid #000; padding: 8px;">${i+1}</td>
-            <td style="border: 1px solid #000; padding: 8px;">${esc(t.school)}</td>
-            <td style="border: 1px solid #000; padding: 8px;">${esc(t.udise || '-')}</td>
-            <td style="border: 1px solid #000; padding: 8px;">${esc(t.teacher)}</td>
-            <td style="border: 1px solid #000; padding: 8px;">${esc(statusLabel(t.status))}</td>
+      </table>
+
+      <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top:10px;">
+        <thead>
+          <tr>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">अ.क्र.</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">शाळा</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">UDISE</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">शिक्षकाचे नाव</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align:left;">स्थिती</th>
           </tr>
-        `).join('')}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${list.map((t, i) => `
+            <tr style="page-break-inside: avoid;">
+              <td style="border: 1px solid #000; padding: 6px;">${i+1}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${esc(t.school)}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${esc(t.udise || '-')}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${esc(t.teacher)}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${esc(statusLabel(t.status))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
   
-  div.innerHTML = html;
-  document.body.appendChild(div);
-
   const opt = {
-    margin:       [0.5, 0.5, 0.5, 0.5],
+    margin:       0.3,
     filename:     `Teacher_Register_Full.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true },
@@ -794,9 +790,7 @@ function exportFullPdf(list, titleText){
     pagebreak:    { mode: 'css', avoid: 'tr' }
   };
 
-  html2pdf().set(opt).from(div).save().then(() => {
-    document.body.removeChild(div);
-  });
+  html2pdf().set(opt).from(html).save();
 }
 
 /* =========================================================
